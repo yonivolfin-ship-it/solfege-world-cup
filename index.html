@@ -257,8 +257,6 @@ async function submit() {
   };
 
   try {
-    status.textContent = "שולח…";
-    const res = await try {
   status.textContent = "שולח…";
   status.className = "muted";
 
@@ -271,17 +269,12 @@ async function submit() {
 
   status.textContent = "נשלח ✅ (בדוק בשיטס שנכנסה שורה)";
   status.className = "ok";
+
 } catch (e) {
-  status.textContent = "שליחה נכשלה (כנראה URL/Deploy).";
+  status.textContent = "שליחה נכשלה (כנראה URL / Deploy).";
   status.className = "err";
 }
-document.getElementById("submitBtn").addEventListener("click", submit);
 
-renderGroups();
-renderAllBrackets();
-</script>
-</body>
-</html>
 
 
 
