@@ -10,15 +10,18 @@
     h1 { font-size: 20px; margin: 0 0 10px; }
     h2 { font-size: 16px; margin: 0 0 10px; }
     label { display: block; margin: 10px 0 6px; }
-    select, input { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid #ccc; }
+    select, input { width: 100%; padding: 10px; border-radius: 12px; border: 1px solid #ccc; background: white; }
     button { padding: 12px 14px; border-radius: 14px; border: 1px solid #111; background: #111; color: #fff; width: 100%; font-size: 16px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .muted { color: #666; font-size: 13px; }
     .ok { color: #0a7; }
     .err { color: #c33; }
+    #errBanner { display:none; border:1px solid #c33; color:#c33; border-radius:14px; padding:10px; margin-bottom:12px; }
   </style>
 </head>
 <body>
+  <div id="errBanner"></div>
+
   <h1>אליפות הסולפג' – טופס הימורים</h1>
   <div class="muted">ממלאים בתים → האתר בונה רבעים/חצאים/גמר → שולחים.</div>
 
@@ -55,226 +58,63 @@
   </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzw9ulLM0lnEpO8iikV2vO2dFKuQ76mzkJFho3JszFE7LCgNwLLmyEiQFwWdHxbXToJ/exec";
-
-// בתים (לפי החלוקה שביצענו קודם בשיחה)
-const HOUSES = {
-  "בית א׳": ["אורי גולן","סתיו","יהונתן","אביתר"],
-  "בית ב׳": ["אמה","דריה","אורי לנקרי","איתמר"],
-  "בית ג׳": ["עופר","אביב","איתי","יהלי"],
-  "בית ד׳": ["אמילי","אריאל","לינוי"]
-};
-
-// מבנה רבעים לפי הקובץ שלך: 1א-2ג, 2א-1ג, 1ב-2ד, 1ד-2ב
-const QUARTER_RULES = [
-  { id:"QF1", title:"רבע גמר 1", a:{house:"בית א׳", pos:1}, b:{house:"בית ג׳", pos:2} },
-  { id:"QF2", title:"רבע גמר 2", a:{house:"בית א׳", pos:2}, b:{house:"בית ג׳", pos:1} },
-  { id:"QF3", title:"רבע גמר 3", a:{house:"בית ב׳", pos:1}, b:{house:"בית ד׳", pos:2} },
-  { id:"QF4", title:"רבע גמר 4", a:{house:"בית ד׳", pos:1}, b:{house:"בית ב׳", pos:2} },
-];
-
-const state = {
-  groups: {},   // { "בית א׳": {1:"...",2:"..."} }
-  quarters: {}, // { QF1:"winner", ... }
-  semis: {},    // { SF1:"winner", SF2:"winner" }
-  finals: {},   // { F:"winner", CHAMP:"winner" }
-};
-
-function el(tag, attrs={}, children=[]) {
-  const n = document.createElement(tag);
-  Object.entries(attrs).forEach(([k,v]) => (k==="class") ? n.className=v : n.setAttribute(k,v));
-  (Array.isArray(children)?children:[children]).forEach(c => n.appendChild(typeof c==="string"?document.createTextNode(c):c));
-  return n;
-}
-
-function makeSelect(options, placeholder="בחר") {
-  const s = el("select");
-  s.appendChild(el("option",{value:""}, placeholder));
-  options.forEach(o => s.appendChild(el("option",{value:o}, o)));
-  return s;
-}
-
-function renderGroups() {
-  const root = document.getElementById("groups");
-  root.innerHTML = "";
-  Object.keys(HOUSES).forEach(house => {
-    const card = el("div",{class:"card"});
-    card.appendChild(el("h2",{}, house));
-
-    const row = el("div",{class:"row"});
-    const s1 = makeSelect(HOUSES[house], "מקום 1");
-    const s2 = makeSelect(HOUSES[house], "מקום 2");
-
-    s1.addEventListener("change", () => {
-      state.groups[house] = state.groups[house] || {};
-      state.groups[house][1] = s1.value;
-      validateHouse(house, s1, s2);
-      renderAllBrackets();
-    });
-    s2.addEventListener("change", () => {
-      state.groups[house] = state.groups[house] || {};
-      state.groups[house][2] = s2.value;
-      validateHouse(house, s1, s2);
-      renderAllBrackets();
-    });
-
-    row.appendChild(el("div",{}, [el("label",{}, "מקום 1"), s1]));
-    row.appendChild(el("div",{}, [el("label",{}, "מקום 2"), s2]));
-    card.appendChild(row);
-    root.appendChild(card);
-  });
-}
-
-function validateHouse(house, s1, s2) {
-  if (s1.value && s2.value && s1.value === s2.value) {
-    alert(`ב${house} אי אפשר לבחור את אותו שם גם מקום 1 וגם מקום 2`);
-    s2.value = "";
-    state.groups[house][2] = "";
-  }
-}
-
-function getPos(house, pos) {
-  return (state.groups[house] && state.groups[house][pos]) ? state.groups[house][pos] : "";
-}
-
-function renderQuarters() {
-  const root = document.getElementById("quarters");
-  root.innerHTML = "";
-
-  QUARTER_RULES.forEach(q => {
-    const a = getPos(q.a.house, q.a.pos);
-    const b = getPos(q.b.house, q.b.pos);
-    const players = [a,b].filter(Boolean);
-
-    const card = el("div",{class:"card"});
-    card.appendChild(el("h2",{}, `${q.title}: ${a||"?"} מול ${b||"?"}`));
-
-    const sel = makeSelect(players.length?players:[], "בחר מנצח");
-    sel.value = state.quarters[q.id] || "";
-    sel.disabled = players.length !== 2;
-
-    sel.addEventListener("change", () => {
-      state.quarters[q.id] = sel.value;
-      renderSemis();
-      renderFinals();
-    });
-
-    card.appendChild(sel);
-    root.appendChild(card);
-  });
-}
-
-function renderSemis() {
-  const root = document.getElementById("semis");
-  root.innerHTML = "";
-
-  const sf1Players = [state.quarters.QF1, state.quarters.QF2].filter(Boolean);
-  const sf2Players = [state.quarters.QF3, state.quarters.QF4].filter(Boolean);
-
-  const sf1 = el("div",{class:"card"});
-  sf1.appendChild(el("h2",{}, `חצי גמר 1: ${sf1Players[0]||"?"} מול ${sf1Players[1]||"?"}`));
-  const sf1Sel = makeSelect(sf1Players.length===2?sf1Players:[], "בחר מנצח");
-  sf1Sel.value = state.semis.SF1 || "";
-  sf1Sel.disabled = sf1Players.length !== 2;
-  sf1Sel.addEventListener("change", ()=>{ state.semis.SF1 = sf1Sel.value; renderFinals(); });
-  sf1.appendChild(sf1Sel);
-
-  const sf2 = el("div",{class:"card"});
-  sf2.appendChild(el("h2",{}, `חצי גמר 2: ${sf2Players[0]||"?"} מול ${sf2Players[1]||"?"}`));
-  const sf2Sel = makeSelect(sf2Players.length===2?sf2Players:[], "בחר מנצח");
-  sf2Sel.value = state.semis.SF2 || "";
-  sf2Sel.disabled = sf2Players.length !== 2;
-  sf2Sel.addEventListener("change", ()=>{ state.semis.SF2 = sf2Sel.value; renderFinals(); });
-  sf2.appendChild(sf2Sel);
-
-  root.appendChild(sf1);
-  root.appendChild(sf2);
-}
-
-function renderFinals() {
-  const root = document.getElementById("finals");
-  root.innerHTML = "";
-
-  const finalists = [state.semis.SF1, state.semis.SF2].filter(Boolean);
-
-  const f = el("div",{class:"card"});
-  f.appendChild(el("h2",{}, `גמר: ${finalists[0]||"?"} מול ${finalists[1]||"?"}`));
-  const fSel = makeSelect(finalists.length===2?finalists:[], "בחר מנצח");
-  fSel.value = state.finals.F || "";
-  fSel.disabled = finalists.length !== 2;
-  fSel.addEventListener("change", ()=>{ state.finals.F = fSel.value; renderChampion(); });
-  f.appendChild(fSel);
-
-  const champ = el("div",{class:"card"});
-  champ.appendChild(el("h2",{}, "אלוף/ה"));
-  const champSel = makeSelect(state.finals.F ? [state.finals.F] : [], "ננעל אחרי בחירת מנצח בגמר");
-  champSel.value = state.finals.CHAMP || "";
-  champSel.disabled = !state.finals.F;
-  champSel.addEventListener("change", ()=>{ state.finals.CHAMP = champSel.value; });
-  champ.appendChild(champSel);
-
-  root.appendChild(f);
-  root.appendChild(champ);
-}
-
-function renderChampion() {
-  // כשהגמר נבחר, ננעל האלוף אוטומטית
-  state.finals.CHAMP = state.finals.F || "";
-  renderFinals();
-}
-
-function renderAllBrackets() {
-  renderQuarters();
-  renderSemis();
-  renderFinals();
-}
-
-function readyToSubmit() {
-  const name = document.getElementById("studentName").value.trim();
-  if (!name) return "חסר שם תלמיד/ה.";
-  // אפשר להקשיח (לדרוש שכל הבתים מלאים וכו’) אם תרצה
-  return "";
-}
-
-async function submit() {
-  const status = document.getElementById("status");
-  status.textContent = "";
-  status.className = "muted";
-
-  const problem = readyToSubmit();
-  if (problem) {
-    status.textContent = problem;
-    status.className = "err";
-    return;
-  }
-
-  const payload = {
-    studentName: document.getElementById("studentName").value.trim(),
-    groups: state.groups,
-    quarters: state.quarters,
-    semis: state.semis,
-    finals: state.finals
+  // מציג שגיאות JS ישירות על המסך (כדי שלא תרגיש ש"הדף נדפק" בלי להבין למה)
+  window.onerror = function(msg, src, line, col) {
+    const b = document.getElementById("errBanner");
+    b.style.display = "block";
+    b.textContent = `שגיאת JavaScript: ${msg} (שורה ${line})`;
   };
 
-  try {
-  status.textContent = "שולח…";
-  status.className = "muted";
+  const SCRIPT_URL = "PASTE_YOUR_SCRIPT_URL_HERE"; // <- תדביק כאן את ה-/exec שלך
 
-  await fetch(SCRIPT_URL, {
-    method: "POST",
-    mode: "no-cors",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
+  // בתים (לפי החלוקה שעשינו)
+  const HOUSES = {
+    "בית א׳": ["אורי גולן","סתיו","יהונתן","אביתר"],
+    "בית ב׳": ["אמה","דריה","אורי לנקרי","איתמר"],
+    "בית ג׳": ["עופר","אביב","איתי","יהלי"],
+    "בית ד׳": ["אמילי","אריאל","לינוי"]
+  };
 
-  status.textContent = "נשלח ✅ (בדוק בשיטס שנכנסה שורה)";
-  status.className = "ok";
+  // רבעים לפי המבנה שבנית
+  const QUARTER_RULES = [
+    { id:"QF1", title:"רבע גמר 1", a:{house:"בית א׳", pos:1}, b:{house:"בית ג׳", pos:2} },
+    { id:"QF2", title:"רבע גמר 2", a:{house:"בית א׳", pos:2}, b:{house:"בית ג׳", pos:1} },
+    { id:"QF3", title:"רבע גמר 3", a:{house:"בית ב׳", pos:1}, b:{house:"בית ד׳", pos:2} },
+    { id:"QF4", title:"רבע גמר 4", a:{house:"בית ד׳", pos:1}, b:{house:"בית ב׳", pos:2} },
+  ];
 
-} catch (e) {
-  status.textContent = "שליחה נכשלה (כנראה URL / Deploy).";
-  status.className = "err";
-}
+  const state = {
+    groups: {},   // { "בית א׳": {1:"...",2:"..."} }
+    quarters: {}, // { QF1:"winner", ... }
+    semis: {},    // { SF1:"winner", SF2:"winner" }
+    finals: {},   // { F:"winner", CHAMP:"winner" }
+  };
 
+  function el(tag, attrs={}, children=[]) {
+    const n = document.createElement(tag);
+    Object.entries(attrs).forEach(([k,v]) => (k==="class") ? n.className=v : n.setAttribute(k,v));
+    (Array.isArray(children)?children:[children]).forEach(c => n.appendChild(typeof c==="string"?document.createTextNode(c):c));
+    return n;
+  }
 
+  function makeSelect(options, placeholder="בחר") {
+    const s = el("select");
+    s.appendChild(el("option",{value:""}, placeholder));
+    options.forEach(o => s.appendChild(el("option",{value:o}, o)));
+    return s;
+  }
 
+  function validateHouse(house, s1, s2) {
+    if (s1.value && s2.value && s1.value === s2.value) {
+      alert(`ב${house} אי אפשר לבחור את אותו שם גם מקום 1 וגם מקום 2`);
+      s2.value = "";
+      state.groups[house][2] = "";
+    }
+  }
 
+  function renderGroups() {
+    const root = document.getElementById("groups");
+    root.innerHTML = "";
+    Object.keys(HOUSES).forEach(house => {
+      const card = el("div",{class:"card"});
+      card.appendChild(e
