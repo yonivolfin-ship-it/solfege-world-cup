@@ -20,103 +20,169 @@
   </style>
 </head>
 <body>
-  <div id="errBanner"></div>
 
-  <h1>אליפות הסולפג' – טופס הימורים</h1>
-  <div class="muted">ממלאים בתים → האתר בונה רבעים/חצאים/גמר → שולחים.</div>
+<div id="errBanner"></div>
 
-  <div class="card">
-    <h2>פרטים</h2>
-    <label>שם התלמיד/ה</label>
-    <input id="studentName" placeholder="למשל: אמה" />
-  </div>
+<h1>אליפות הסולפג' – טופס הימורים</h1>
+<div class="muted">ממלאים בתים → רבעים → חצאים → גמר → שולחים.</div>
 
-  <div class="card">
-    <h2>שלב הבתים</h2>
-    <div id="groups"></div>
-    <div class="muted">בכל בית לבחור מקום 1 ומקום 2 (לא אותו שם פעמיים).</div>
-  </div>
+<div class="card">
+  <h2>פרטים</h2>
+  <label>שם התלמיד/ה</label>
+  <input id="studentName" placeholder="למשל: אמה" />
+</div>
 
-  <div class="card">
-    <h2>רבע גמר (נבנה אוטומטית)</h2>
-    <div id="quarters"></div>
-  </div>
+<div class="card">
+  <h2>שלב הבתים</h2>
+  <div id="groups"></div>
+  <div class="muted">בכל בית לבחור מקום 1 ומקום 2 (לא אותו שם פעמיים).</div>
+</div>
 
-  <div class="card">
-    <h2>חצי גמר</h2>
-    <div id="semis"></div>
-  </div>
+<div class="card">
+  <h2>רבע גמר</h2>
+  <div id="quarters"></div>
+</div>
 
-  <div class="card">
-    <h2>גמר + אלוף</h2>
-    <div id="finals"></div>
-  </div>
+<div class="card">
+  <h2>חצי גמר</h2>
+  <div id="semis"></div>
+</div>
 
-  <div class="card">
-    <button id="submitBtn">שלח הימורים</button>
-    <div id="status" class="muted" style="margin-top:10px;"></div>
-  </div>
+<div class="card">
+  <h2>גמר + אלוף</h2>
+  <div id="finals"></div>
+</div>
+
+<div class="card">
+  <button id="submitBtn">שלח הימורים</button>
+  <div id="status" class="muted" style="margin-top:10px;"></div>
+</div>
 
 <script>
-  // מציג שגיאות JS ישירות על המסך (כדי שלא תרגיש ש"הדף נדפק" בלי להבין למה)
-  window.onerror = function(msg, src, line, col) {
-    const b = document.getElementById("errBanner");
-    b.style.display = "block";
-    b.textContent = `שגיאת JavaScript: ${msg} (שורה ${line})`;
-  };
+/* ====== DEBUG ====== */
+window.onerror = function(msg, src, line) {
+  const b = document.getElementById("errBanner");
+  b.style.display = "block";
+  b.textContent = `שגיאת JavaScript: ${msg} (שורה ${line})`;
+};
 
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxejqXEMxxsnDmUoA6lgjG3DNTMywixNedOsKXixA1xYhoEx212-l8AbenXe2RPDL4X/exec"; // <- תדביק כאן את ה-/exec שלך
+/* ====== SCRIPT URL ====== */
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxejqXEMxxsnDmUoA6lgjG3DNTMywixNedOsKXixA1xYhoEx212-l8AbenXe2RPDL4X/exec";
 
-  // בתים (לפי החלוקה שעשינו)
-  const HOUSES = {
-    "בית א׳": ["אורי גולן","סתיו","יהונתן","אביתר"],
-    "בית ב׳": ["אמה","דריה","אורי לנקרי","איתמר"],
-    "בית ג׳": ["עופר","אביב","איתי","יהלי"],
-    "בית ד׳": ["אמילי","אריאל","לינוי"]
-  };
+/* ====== DATA ====== */
+const HOUSES = {
+  "בית א׳": ["אורי גולן","סתיו","יהונתן","אביתר"],
+  "בית ב׳": ["אמה","דריה","אורי לנקרי","איתמר"],
+  "בית ג׳": ["עופר","אביב","איתי","יהלי"],
+  "בית ד׳": ["אמילי","אריאל","לינוי"]
+};
 
-  // רבעים לפי המבנה שבנית
-  const QUARTER_RULES = [
-    { id:"QF1", title:"רבע גמר 1", a:{house:"בית א׳", pos:1}, b:{house:"בית ג׳", pos:2} },
-    { id:"QF2", title:"רבע גמר 2", a:{house:"בית א׳", pos:2}, b:{house:"בית ג׳", pos:1} },
-    { id:"QF3", title:"רבע גמר 3", a:{house:"בית ב׳", pos:1}, b:{house:"בית ד׳", pos:2} },
-    { id:"QF4", title:"רבע גמר 4", a:{house:"בית ד׳", pos:1}, b:{house:"בית ב׳", pos:2} },
-  ];
+const QUARTERS = [
+  {id:"QF1", a:["בית א׳",1], b:["בית ג׳",2]},
+  {id:"QF2", a:["בית א׳",2], b:["בית ג׳",1]},
+  {id:"QF3", a:["בית ב׳",1], b:["בית ד׳",2]},
+  {id:"QF4", a:["בית ד׳",1], b:["בית ב׳",2]}
+];
 
-  const state = {
-    groups: {},   // { "בית א׳": {1:"...",2:"..."} }
-    quarters: {}, // { QF1:"winner", ... }
-    semis: {},    // { SF1:"winner", SF2:"winner" }
-    finals: {},   // { F:"winner", CHAMP:"winner" }
-  };
+const state = { groups:{}, quarters:{}, semis:{}, finals:{} };
 
-  function el(tag, attrs={}, children=[]) {
-    const n = document.createElement(tag);
-    Object.entries(attrs).forEach(([k,v]) => (k==="class") ? n.className=v : n.setAttribute(k,v));
-    (Array.isArray(children)?children:[children]).forEach(c => n.appendChild(typeof c==="string"?document.createTextNode(c):c));
-    return n;
+/* ====== HELPERS ====== */
+const el = (t,c={},ch=[]) => {
+  const e=document.createElement(t);
+  Object.entries(c).forEach(([k,v])=>k==="class"?e.className=v:e.setAttribute(k,v));
+  (Array.isArray(ch)?ch:[ch]).forEach(x=>e.appendChild(typeof x==="string"?document.createTextNode(x):x));
+  return e;
+};
+
+const select = (opts,ph) => {
+  const s=el("select");
+  s.appendChild(el("option",{value:""},ph));
+  opts.forEach(o=>s.appendChild(el("option",{value:o},o)));
+  return s;
+};
+
+/* ====== RENDER ====== */
+function renderGroups(){
+  const root=document.getElementById("groups");
+  root.innerHTML="";
+  Object.keys(HOUSES).forEach(h=>{
+    const c=el("div",{class:"card"});
+    c.appendChild(el("h2",{},h));
+    const r=el("div",{class:"row"});
+    const s1=select(HOUSES[h],"מקום 1");
+    const s2=select(HOUSES[h],"מקום 2");
+
+    s1.onchange=()=>{state.groups[h]=state.groups[h]||{};state.groups[h][1]=s1.value;renderAll();};
+    s2.onchange=()=>{state.groups[h]=state.groups[h]||{};state.groups[h][2]=s2.value;renderAll();};
+
+    r.appendChild(el("div",{},[el("label",{},"מקום 1"),s1]));
+    r.appendChild(el("div",{},[el("label",{},"מקום 2"),s2]));
+    c.appendChild(r); root.appendChild(c);
+  });
+}
+
+function pos(h,p){return state.groups[h]?.[p]||"";}
+
+function renderQuarters(){
+  const r=document.getElementById("quarters"); r.innerHTML="";
+  QUARTERS.forEach(q=>{
+    const a=pos(...q.a), b=pos(...q.b);
+    const opts=[a,b].filter(Boolean);
+    const c=el("div",{class:"card"});
+    c.appendChild(el("h2",{},`${a||"?"} מול ${b||"?"}`));
+    const s=select(opts,"בחר מנצח");
+    s.disabled=opts.length!==2;
+    s.onchange=()=>{state.quarters[q.id]=s.value;renderSemis();};
+    c.appendChild(s); r.appendChild(c);
+  });
+}
+
+function renderSemis(){
+  const r=document.getElementById("semis"); r.innerHTML="";
+  const s1=[state.quarters.QF1,state.quarters.QF2].filter(Boolean);
+  const s2=[state.quarters.QF3,state.quarters.QF4].filter(Boolean);
+
+  [s1,s2].forEach((arr,i)=>{
+    const c=el("div",{class:"card"});
+    c.appendChild(el("h2",{},`חצי גמר ${i+1}`));
+    const s=select(arr,"בחר מנצח");
+    s.disabled=arr.length!==2;
+    s.onchange=()=>{state.semis["SF"+(i+1)]=s.value;renderFinals();};
+    c.appendChild(s); r.appendChild(c);
+  });
+}
+
+function renderFinals(){
+  const r=document.getElementById("finals"); r.innerHTML="";
+  const f=[state.semis.SF1,state.semis.SF2].filter(Boolean);
+  const c=el("div",{class:"card"});
+  c.appendChild(el("h2",{},`גמר: ${f[0]||"?"} מול ${f[1]||"?"}`));
+  const s=select(f,"בחר אלוף");
+  s.disabled=f.length!==2;
+  s.onchange=()=>state.finals.CHAMP=s.value;
+  c.appendChild(s); r.appendChild(c);
+}
+
+function renderAll(){ renderQuarters(); renderSemis(); renderFinals(); }
+
+/* ====== SUBMIT ====== */
+async function submit(){
+  const status=document.getElementById("status");
+  const name=document.getElementById("studentName").value.trim();
+  if(!name){status.textContent="חסר שם.";status.className="err";return;}
+
+  try{
+    status.textContent="שולח…"; status.className="muted";
+    await fetch(SCRIPT_URL,{method:"POST",mode:"no-cors",body:JSON.stringify({studentName:name,...state})});
+    status.textContent="נשלח ✅ (בדוק בשיטס)"; status.className="ok";
+  }catch(e){
+    status.textContent="שליחה נכשלה."; status.className="err";
   }
+}
 
-  function makeSelect(options, placeholder="בחר") {
-    const s = el("select");
-    s.appendChild(el("option",{value:""}, placeholder));
-    options.forEach(o => s.appendChild(el("option",{value:o}, o)));
-    return s;
-  }
+document.getElementById("submitBtn").onclick=submit;
 
-  function validateHouse(house, s1, s2) {
-    if (s1.value && s2.value && s1.value === s2.value) {
-      alert(`ב${house} אי אפשר לבחור את אותו שם גם מקום 1 וגם מקום 2`);
-      s2.value = "";
-      state.groups[house][2] = "";
-    }
-  }
-
-  function renderGroups() {
-    const root = document.getElementById("groups");
-    root.innerHTML = "";
-    Object.keys(HOUSES).forEach(house => {
-      const card = el("div",{class:"card"});
-      card.appendChild(e
-
-
+renderGroups(); renderAll();
+</script>
+</body>
+</html>
