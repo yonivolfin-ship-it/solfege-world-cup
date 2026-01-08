@@ -258,21 +258,23 @@ async function submit() {
 
   try {
     status.textContent = "שולח…";
-    const res = await fetch(SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const json = await res.json().catch(()=>({}));
-    if (!res.ok || !json.ok) throw new Error("Bad response");
-    status.textContent = "נשלח בהצלחה ✅";
-    status.className = "ok";
-  } catch (e) {
-    status.textContent = "שליחה נכשלה. בדוק שהדבקת נכון את SCRIPT_URL ושפרסת את ה-Web App כ-Anyone.";
-    status.className = "err";
-  }
-}
+    const res = await try {
+  status.textContent = "שולח…";
+  status.className = "muted";
 
+  await fetch(SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  status.textContent = "נשלח ✅ (בדוק בשיטס שנכנסה שורה)";
+  status.className = "ok";
+} catch (e) {
+  status.textContent = "שליחה נכשלה (כנראה URL/Deploy).";
+  status.className = "err";
+}
 document.getElementById("submitBtn").addEventListener("click", submit);
 
 renderGroups();
@@ -280,5 +282,6 @@ renderAllBrackets();
 </script>
 </body>
 </html>
+
 
 
